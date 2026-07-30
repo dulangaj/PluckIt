@@ -12,7 +12,7 @@ result on the clipboard.
 ## Build it yourself
 
 ```bash
-./build.sh --install
+scripts/build.sh --install
 ```
 
 That compiles the app, signs it **ad hoc** (`codesign -s -`), and copies it to
@@ -29,6 +29,15 @@ iOS, not to ad-hoc-signed Mac apps.
 
 Rebuilding produces a new signature, so the app is treated as a fresh binary;
 if you have granted it any privacy permissions, macOS may ask again.
+
+## App icon
+
+```bash
+scripts/update-app-icon.sh path/to/image.png
+```
+
+Regenerates every size in `PluckIt/Assets.xcassets/AppIcon.appiconset` from a
+single source image (at least 1024×1024).
 
 ## Sandbox
 

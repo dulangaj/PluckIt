@@ -1,11 +1,11 @@
 #!/bin/bash
 # Builds PluckIt.app and signs it ad hoc — no Apple Developer account required.
 #
-#   ./build.sh              build into ./build/PluckIt.app
-#   ./build.sh --install    build, then copy into /Applications
+#   scripts/build.sh              build into ./build/PluckIt.app
+#   scripts/build.sh --install    build, then copy into /Applications
 set -euo pipefail
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 CONFIGURATION="${CONFIGURATION:-Release}"
 DERIVED_DATA="${DERIVED_DATA:-.derived}"
