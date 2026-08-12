@@ -1,8 +1,10 @@
 # PluckIt
 
-A macOS app that pulls text out of images. Paste from the clipboard or drop an
-image on the window; Vision runs OCR and the result lands in an editable text
-view next to a zoomable preview of the source.
+Some websites, apps, and PDFs make it hard to copy text off them. PluckIt turns
+that into a matter of taking a screenshot and pasting it in.
+
+Paste from the clipboard or drop an image on the window; Vision runs OCR and the
+result lands in an editable text view next to a zoomable preview of the source.
 
 **Clean Up** applies the usual post-OCR fixes — join wrapped lines, mend
 hyphenated line breaks, collapse or strip spaces, drop empty lines — each one
