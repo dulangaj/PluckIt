@@ -12,8 +12,10 @@ struct ContentView: View {
     @State private var extractedText: String = ""
     @State private var pastedImage: NSImage?
     @State private var isDropTargeted: Bool = false
-    /// Average Vision recognition confidence (0...1) for the most recent extraction, if any.
-    @State private var recognitionConfidence: Float?
+    /// The most recent extraction, kept so the output mode can be switched
+    /// without re-running recognition.
+    @State private var extraction: DocumentPipeline.Extraction?
+    @State private var outputMode: DocumentPipeline.OutputMode = .automatic
     @State private var isRecognizing: Bool = false
     /// Set once recognition has run long enough that it deserves an explanation
     /// (the system may be compiling recognition models, e.g. after an OS update).
@@ -26,7 +28,7 @@ struct ContentView: View {
     @State private var copyFeedbackTask: Task<Void, Never>?
     @Environment(\.undoManager) private var undoManager
 
-    private let recognizer = TextRecognizer()
+    private let pipeline = DocumentPipeline()
 
     var body: some View {
         VStack {
@@ -59,7 +61,7 @@ struct ContentView: View {
         )
         .onDrop(of: [.image, .fileURL], isTargeted: $isDropTargeted, perform: handleDrop)
         .task {
-            await recognizer.warmUp()
+            await pipeline.warmUp()
         }
     }
 
@@ -129,6 +131,22 @@ struct ContentView: View {
         .accessibilityLabel("Clean up extracted text")
     }
 
+    private var outputModePicker: some View {
+        Picker("Output", selection: $outputMode) {
+            ForEach(DocumentPipeline.OutputMode.allCases) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+        .help("Choose how the extracted document is rendered")
+        .accessibilityLabel("Output format")
+        .onChange(of: outputMode) { _, newMode in
+            guard let extraction else { return }
+            replaceExtractedText(with: extraction.text(for: newMode), actionName: "Change Output Format")
+        }
+    }
+
     private var copyButton: some View {
         Button {
             copyExtractedTextToClipboard()
@@ -169,9 +187,7 @@ struct ContentView: View {
     }
 
     private func copyExtractedTextToClipboard() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(extractedText, forType: .string)
+        copyToClipboard(extractedText, announcement: "Copied extracted text")
 
         didJustCopy = true
         copyFeedbackTask?.cancel()
@@ -180,7 +196,13 @@ struct ContentView: View {
             guard !Task.isCancelled else { return }
             didJustCopy = false
         }
-        AccessibilityNotification.Announcement("Copied extracted text").post()
+    }
+
+    private func copyToClipboard(_ string: String, announcement: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(string, forType: .string)
+        AccessibilityNotification.Announcement(announcement).post()
     }
 
     // MARK: - Status bar
@@ -190,33 +212,22 @@ struct ContentView: View {
         return HStack(spacing: 6) {
             HStack(spacing: 6) {
                 Text(stats.summary)
-                if let recognitionConfidence, !extractedText.isEmpty {
-                    Text("·")
-                    Text("\(Int((recognitionConfidence * 100).rounded()))% confidence")
-                }
             }
             .font(.callout)
             .foregroundStyle(.secondary)
             .monospacedDigit()
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(statusAccessibilityLabel(stats))
+            .accessibilityLabel(stats.accessibleSummary)
 
             Spacer()
 
             Group {
+                outputModePicker
                 cleanUpMenu
                 copyButton
             }
             .disabled(extractedText.isEmpty || isRecognizing)
         }
-    }
-
-    private func statusAccessibilityLabel(_ stats: TextStats) -> String {
-        var label = stats.accessibleSummary
-        if let recognitionConfidence, !extractedText.isEmpty {
-            label += ", \(Int((recognitionConfidence * 100).rounded())) percent recognition confidence"
-        }
-        return label
     }
 
     @ViewBuilder
@@ -242,7 +253,7 @@ struct ContentView: View {
         guard let image = NSPasteboard.general.readObjects(forClasses: [NSImage.self], options: [:])?.first as? NSImage else {
             extractedText = "No image found on the clipboard."
             pastedImage = nil
-            recognitionConfidence = nil
+            extraction = nil
             originalExtractedText = nil
             return
         }
@@ -281,7 +292,7 @@ struct ContentView: View {
 
     private func process(image: NSImage) {
         pastedImage = image
-        recognitionConfidence = nil
+        extraction = nil
         recognitionTask?.cancel()
 
         guard let cgImage = image.fullResolutionCGImage else {
@@ -293,11 +304,11 @@ struct ContentView: View {
         isRecognizing = true
         recognitionTask = Task { @MainActor in
             do {
-                let extraction = try await recognizer.recognize(in: cgImage)
+                let result = try await pipeline.extract(from: cgImage)
                 guard !Task.isCancelled else { return }
-                extractedText = extraction.text
-                originalExtractedText = extraction.text
-                recognitionConfidence = extraction.confidence
+                extraction = result
+                extractedText = result.text(for: outputMode)
+                originalExtractedText = extractedText
             } catch {
                 guard !Task.isCancelled else { return }
                 extractedText = "Failed to perform text recognition: \(error.localizedDescription)"
