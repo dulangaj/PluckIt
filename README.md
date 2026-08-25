@@ -1,8 +1,13 @@
 # PluckIt
 
 A macOS app that pulls text out of images. Paste from the clipboard or drop an
-image on the window; Vision runs OCR and the result lands in an editable text
-view next to a zoomable preview of the source.
+image on the window; Vision reads the document and the result lands in an
+editable text view next to a zoomable preview of the source.
+
+Extraction understands layout, not just lines: headings, paragraphs, lists,
+tables, and detected barcodes/QR codes are reconstructed as **Markdown**. The
+**Output** picker switches between Markdown, plain text, and *Automatic*, which
+picks Markdown only when the page actually has structure.
 
 **Clean Up** applies the usual post-OCR fixes — join wrapped lines, mend
 hyphenated line breaks, collapse or strip spaces, drop empty lines — each one
@@ -18,7 +23,7 @@ scripts/build.sh --install
 That compiles the app, signs it **ad hoc** (`codesign -s -`), and copies it to
 `/Applications`. Drop `--install` to leave the app in `./build`.
 
-Requirements: macOS 15 or later and Xcode (the full app — `xcodebuild` needs it
+Requirements: macOS 26 or later (Vision's document recognition) and Xcode (the full app — `xcodebuild` needs it
 to compile the asset catalog).
 
 There is no Developer ID and no notarization here, and none is needed: macOS
